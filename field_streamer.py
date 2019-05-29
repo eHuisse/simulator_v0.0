@@ -1,5 +1,5 @@
 import pyaudio
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, Queue
 import numpy as np
 import time
 import config

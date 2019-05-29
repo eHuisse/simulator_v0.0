@@ -2,7 +2,6 @@ import pygame
 from pygame.locals import *
 import time
 import numpy as np
-from matplotlib import pyplot as plt
 from multiprocessing import Process, Queue, Pipe
 
 
@@ -15,31 +14,29 @@ RED =   (255,   0,   0)
 
 
 class Feature_streamer(Process):
-    def __init__(self, feature_width=50):
+    def __init__(self, speedQueue, feature_width=50):
+        '''
+        This class is multiprocessing. It is used to stream on screen some feature for the stimulation of bee.
+        :param speedQueue (Real): This queue is used to stream the moving speed of the feature if - to the left if + to the right
+        :param feature_width (Int): The features are rectangle, this is their width
+        '''
         super(Feature_streamer, self).__init__()
-        self._running = True
+        self._running = True    #Flag for stopping program
         self._display_surf = None
-        self.clock = pygame.time.Clock()
+        self.clock = pygame.time.Clock() #To see FPS
         self.size = self.width, self.height = 1280, 720
         self._time_previous = time.time()
-        self._feature_offset = 0
+        self._feature_offset = 0    # This value will be incremented or decremented in fonction of feature move
         self._feature_width = feature_width
         self._feature = np.array([])
-
-        self.change_feature(self._feature_width)
-
-    def change_feature(self, feature_width):
-        self._feature_width = feature_width
-        new_width = int(self.width // (2 * self._feature_width) + 2) * (2 * self._feature_width)
-        self._feature = np.zeros((new_width, self.height, 3))
-        white = np.array([255, 255, 255])
-
-        for i in range(new_width):
-            modulo_step = i % (2 * self._feature_width)
-            if modulo_step < self._feature_width:
-                self._feature[i, :, :] = white
+        self.speed_queue = speedQueue
+        self.feature_speed = 0
 
     def on_init(self):
+        '''
+        Simple initialisation of pyGame
+        :return:
+        '''
         pygame.init()
         self._display_surf = pygame.display.set_mode(self.size,
                                                      RESIZABLE)
@@ -49,12 +46,14 @@ class Feature_streamer(Process):
         if event.type == pygame.QUIT:
             self._running = False
 
-    def on_loop(self):
+    def on_loop(self, asked_speed):
         # Draw a solid rectangle
+        # Give us a the point in pixel of begining for each feature
         index = np.arange(0, self.width + 4 * self._feature_width, self._feature_width)
+        #Give a list of same length with one or zero alternate (black and white)
         black_or_white = [bool(i % 2) for i in range(len(index))]
         i=0
-        offset = self.ask_feature_offset()
+        offset = self.ask_feature_offset(speed=asked_speed)
 
 
         for ind in range(len(index)):
@@ -92,8 +91,9 @@ class Feature_streamer(Process):
         pass
 
     def on_cleanup(self):
+        pygame.display.quit()
         pygame.quit()
-        super(Feature_streamer, self).terminate()
+
 
     def ask_feature_offset(self, speed=-5., feature_width=50):
         delta_T = time.time() - self._time_previous
@@ -113,19 +113,34 @@ class Feature_streamer(Process):
         while (self._running):
             for event in pygame.event.get():
                 if event.type == QUIT:
-                    pygame.display.quit()
+                    self.on_cleanup()
                 elif event.type == VIDEORESIZE:
                     self.size = self.width, self.height = event.dict['size']
                     self._display_surf = pygame.display.set_mode(event.dict['size'], RESIZABLE)
-                    self.change_feature(self._feature_width)
-                    self.on_loop()
+                    self.on_loop(self.feature_speed)
                     self.on_render()
+            if self.speed_queue.full():
+                self.feature_speed = self.speed_queue.get()
 
-            self.on_loop()
+            self.on_loop(self.feature_speed)
             self.on_render()
         self.on_cleanup()
 
+    def terminate(self):
+        super(Feature_streamer, self).terminate()
+
 
 if __name__ == "__main__":
-    theApp = Feature_streamer ()
-    theApp.on_execute()
+    speedQueue = Queue(1)
+    theApp = Feature_streamer(speedQueue)
+    theApp.start()
+
+    for i in range(100):
+        try:
+            speedQueue.put_nowait(10*np.sin(0.02*np.pi*i))
+        except:
+            pass
+        time.sleep(0.1)
+        print(i)
+
+    theApp.terminate()

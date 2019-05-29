@@ -26,7 +26,12 @@ class ImageStreamer(Process):
         super(ImageStreamer, self).terminate()
 
     def run(self):
-        self._camera = cv2.VideoCapture(1)
+        self._camera = cv2.VideoCapture(0)
+        if not self._camera.read()[0]:
+            self._camera = cv2.VideoCapture(1)
+            if not self._camera.read()[0]:
+                raise("Camera not conected")
+
         self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
         self._camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
         self._camera.set(cv2.CAP_PROP_FPS, self.frame_rate)
@@ -73,9 +78,8 @@ if __name__ == "__main__":
             i = i + 1
 
             image = camera_queue.get(True)
-            print(i, 1/(time.time() - before))
+            print("FPS : " + str(1/(time.time() - before)))
             before = time.time()
-            print(image[0].shape)
             cv2.imshow('frame', image[0])
             cv2.waitKey(1)
 

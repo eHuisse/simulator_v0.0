@@ -1,49 +1,99 @@
-import RPi.GPIO as GPIO
-import time
+from tkinter import *
+import math, random, threading, time
 
-RECORD_BUTTON = 2
-RECORD_LED = 4
+class StripChart:
+    def __init__(self, root):
+        self.gf = self.makeGraph(root)
+        self.cf = self.makeControls(root)
+        self.gf.pack()
+        self.cf.pack()
+        self.Reset()
 
-LED_1 = 17
-LED_2 = 27
-LED_3 = 22
-LED_4 = 10
-LED_5 = 9
-LED_6 = 11
-LED_7 = 18
-LED_8 = 23
-LED_9 = 24
+    def makeGraph(self, frame):
+        self.sw = 1000
+        self.h = 200
+        self.top = 2
+        gf = Canvas(frame, width=self.sw, height=self.h+10,
+                    bg="#002", bd=0, highlightthickness=0)
+        gf.p = PhotoImage(width=2*self.sw, height=self.h)
+        self.item = gf.create_image(0, self.top, image=gf.p, anchor=NW)
+        return(gf)
 
+    def makeControls(self, frame):
+        cf = Frame(frame, borderwidth=1, relief="raised")
+        Button(cf, text="Run", command=self.Run).grid(column=2, row=2)
+        Button(cf, text="Stop", command=self.Stop).grid(column=4, row=2)
+        Button(cf, text="Reset", command=self.Reset).grid(column=6, row=2)
+        self.fps = Label(cf, text="0 fps")
+        self.fps.grid(column=2, row=4, columnspan=5)
+        return(cf)
 
-Led_status = 1
+    def Run(self):
+        self.go = 1
+        for t in threading.enumerate():
+            if t.name == "_gen_":
+                print("already running")
+                return
+        threading.Thread(target=self.do_start, name="_gen_").start()
 
-def setup():
-    GPIO.setmode(GPIO.BCM)     # Numbers GPIOs by physical location
-    GPIO.setup(RECORD_LED, GPIO.OUT)   # Set LedPin's mode is output
-    GPIO.setup(RECORD_BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)    # Set BtnPin's mode is input, and pull up to high level(3.3V)
-    GPIO.output(RECORD_LED, GPIO.HIGH) # Set LedPin high(+3.3V) to off led
+    def Stop(self):
+        self.go = 0
+        for t in threading.enumerate():
+            if t.name == "_gen_":
+                t.join()
 
-def swLed(ev=None):
-    global Led_status
-    Led_status = not Led_status
-    GPIO.output(RECORD_LED, Led_status)  # switch led status(on-->off; off-->on)
-    if Led_status == 1:
-        print 'led on...'
-    else:
-        print '...led off'
+    def Reset(self):
+        self.Stop()
+        self.clearstrip(self.gf.p, '#345')
 
-def loop():
-    GPIO.add_event_detect(RECORD_BUTTON, GPIO.FALLING, callback=swLed, bouncetime=200) # wait for falling and set bouncetime to prevent the callback function from being called multiple times when the button is pressed
-    while True:
-        time.sleep(1)   # Don't do anything
+    def do_start(self):
+        t = 0
+        y2 = 0
+        tx = time.time()
+        while self.go:
+            y1 = 0.2*math.sin(0.02*math.pi*t)
+            y2 = 0.9*y2 + 0.1*(random.random()-0.5)
+            self.scrollstrip(self.gf.p,
+               (0.25+y1,   0.25, 0.7+y2,   0.6,     0.7,   0.8),
+               ( '#ff4', '#f40', '#4af', '#080', '#0f0', '#080'),
+                 "" if t % 65 else "#088")
 
-def destroy():
-    GPIO.output(RECORD_LED, GPIO.HIGH)     # led off
-    GPIO.cleanup()                     # Release resource
+            t += 1
+            if not t % 100:
+                tx2 = time.time()
+                self.fps.config(text='%d fps' % int(100/(tx2 - tx)))
+                tx = tx2
+#            time.sleep(0.001)
 
-if __name__ == '__main__':     # Program start from here
-    setup()
-    try:
-        loop()
-    except KeyboardInterrupt:  # When 'Ctrl+C' is pressed, the child program destroy() will be  executed.
-        destroy()
+    def clearstrip(self, p, color):  # Fill strip with background color
+        self.bg = color              # save background color for scroll
+        self.data = None             # clear previous data
+        self.x = 0
+        p.tk.call(p, 'put', color, '-to', 0, 0, p['width'], p['height'])
+
+    def scrollstrip(self, p, data, colors, bar=""):   # Scroll the strip, add new data
+        self.x = (self.x + 1) % self.sw               # x = double buffer position
+        bg = bar if bar else self.bg
+        p.tk.call(p, 'put', bg, '-to', self.x, 0,
+                  self.x+1, self.h)
+        p.tk.call(p, 'put', bg, '-to', self.x+self.sw, 0,
+                  self.x+self.sw+1, self.h)
+        self.gf.coords(self.item, -1-self.x, self.top)  # scroll to just-written column
+        if not self.data:
+            self.data = data
+        for d in range(len(data)):
+            y0 = int((self.h-1) * (1.0-self.data[d]))   # plot all the data points
+            y1 = int((self.h-1) * (1.0-data[d]))
+            ya, yb = sorted((y0, y1))
+            for y in range(ya, yb+1):                   # connect the dots
+                p.put(colors[d], (self.x,y))
+                p.put(colors[d], (self.x+self.sw,y))
+        self.data = data            # save for next call
+
+def main():
+    root = Tk()
+    root.title("StripChart")
+    app = StripChart(root)
+    root.mainloop()
+
+main()
