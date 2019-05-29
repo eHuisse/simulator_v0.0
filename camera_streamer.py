@@ -1,10 +1,7 @@
 import io
 import time
 from multiprocessing import Process, Queue, Pipe
-import threading
-from matplotlib import pyplot as plt
-import picamera
-from PIL import Image
+import cv2
 
 #class Imageandstamp(object):
 #    def __init__(self.):
@@ -29,31 +26,38 @@ class ImageStreamer(Process):
         super(ImageStreamer, self).terminate()
 
     def run(self):
-        self._camera = picamera.PiCamera()
-        self._camera.resolution = self.resolution
-        self._camera.framerate = self.frame_rate
+        self._camera = cv2.VideoCapture(1)
+        self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+        self._camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+        self._camera.set(cv2.CAP_PROP_FPS, self.frame_rate)
+        self._camera.set(cv2.CAP_PROP_EXPOSURE, 20)
+
+        #self._camera.resolution = self.resolution
+        #self._camera.framerate = self.frame_rate
         # Begin streaming
-        self._camera.start_recording(self, format='mjpeg')
-        print("yolo")
+        # self._camera.start_recording(self, format='mjpeg')
 
         while not self.stopped:
-            self._camera.wait_recording(0.0001)
-        self._camera.stop_recording()
-        self._camera.close()
+            receive_time = time.time()
+            _, frame = self._camera.read()
+            self.streaming_queue.put([frame, receive_time])
+            cv2.waitKey(1)
+
+        self._camera.release()
 
         return self
 
-    def write(self, buf):
-        # Start of new frame; close the old one (if any) and
-        # open a new output
-        print("yolo")
-        if buf.startswith(b'\xff\xd8'):
-            receive_time = time.time()
-            self.raw_capture.seek(0)
-            self.raw_capture.truncate()
-            self.raw_capture.write(buf)
-            PIL_image = Image.open(self.raw_capture)
-            self.streaming_queue.put([PIL_image, receive_time])
+    # def write(self, buf):
+    #     # Start of new frame; close the old one (if any) and
+    #     # open a new output
+    #     print("yolo")
+    #     if buf.startswith(b'\xff\xd8'):
+    #         receive_time = time.time()
+    #         self.raw_capture.seek(0)
+    #         self.raw_capture.truncate()
+    #         self.raw_capture.write(buf)
+    #         PIL_image = Image.open(self.raw_capture)
+    #         self.streaming_queue.put([PIL_image, receive_time])
 
 
 if __name__ == "__main__":
@@ -69,10 +73,11 @@ if __name__ == "__main__":
             i = i + 1
 
             image = camera_queue.get(True)
-            print(image[1])
             print(i, 1/(time.time() - before))
             before = time.time()
+            print(image[0].shape)
+            cv2.imshow('frame', image[0])
+            cv2.waitKey(1)
 
-    image.save('out.jpg')
     image_streamer.terminate()
 

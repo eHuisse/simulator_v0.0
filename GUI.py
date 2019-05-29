@@ -3,6 +3,7 @@ from pygame.locals import *
 import time
 import numpy as np
 from matplotlib import pyplot as plt
+from multiprocessing import Process, Queue, Pipe
 
 
 BLACK = (  0,   0,   0)
@@ -13,8 +14,9 @@ RED =   (255,   0,   0)
 
 
 
-class App:
+class Feature_streamer(Process):
     def __init__(self, feature_width=50):
+        super(Feature_streamer, self).__init__()
         self._running = True
         self._display_surf = None
         self.clock = pygame.time.Clock()
@@ -81,17 +83,6 @@ class App:
                                              self.height)
                     pygame.draw.rect(self._display_surf, (0, 0, 0), black_rect)
                     pygame.display.update(black_rect)
-
-        # while i < int(self.width // (2 * self._feature_width) + 1):
-        #     white_rect = pygame.Rect(i*self._feature_width*2 + offset, 0, self._feature_width, self.height)
-        #     pygame.draw.rect(self._display_surf, (255, 255, 255), white_rect)
-        #     pygame.display.update(white_rect)
-        #     black_rect = pygame.Rect((2 * i + 1) * self._feature_width + offset, 0, self._feature_width, self.height)
-        #     pygame.draw.rect(self._display_surf, (0, 0, 0), black_rect)
-        #     pygame.display.update(black_rect)
-        #     i = i + 1
-
-
         self._time_previous = time.time()
 
 
@@ -102,12 +93,11 @@ class App:
 
     def on_cleanup(self):
         pygame.quit()
+        super(Feature_streamer, self).terminate()
 
-    def ask_feature_offset(self, colors = (255, 255, 255), speed=-5., feature_width=50):
+    def ask_feature_offset(self, speed=-5., feature_width=50):
         delta_T = time.time() - self._time_previous
         self._feature_offset = self._feature_offset + 2 * feature_width * delta_T * speed
-        #
-        #self._feature_offset = self._feature_offset - 1
 
         if self._feature_offset >= self._feature_width * 2:
             self._feature_offset = 0.
@@ -116,7 +106,7 @@ class App:
 
         return self._feature_offset
 
-    def on_execute(self):
+    def run(self):
         if self.on_init() == False:
             self._running = False
 
@@ -137,5 +127,5 @@ class App:
 
 
 if __name__ == "__main__":
-    theApp = App()
+    theApp = Feature_streamer ()
     theApp.on_execute()
