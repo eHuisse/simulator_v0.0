@@ -1,6 +1,6 @@
 import io
 import time
-from multiprocessing import Process, Queue, Pipe
+from multiprocessing import Process, Queue, Pipe, Manager
 import cv2
 
 #class Imageandstamp(object):
@@ -8,7 +8,7 @@ import cv2
 
 
 class ImageStreamer(Process):
-    def __init__(self, streaming_queue, resolution=(640, 480), frame_rate=30):
+    def __init__(self, streaming_queue, stop_event, resolution=(640, 480), frame_rate=30):
         super(ImageStreamer, self).__init__()
         self.streaming_queue = streaming_queue
         self._camera = None
@@ -18,19 +18,20 @@ class ImageStreamer(Process):
         # initialize the frame and the variable used to indicate
         # if the thread should be stopped
 
-        self.stopped = False
+
+        self.stop_event = stop_event
 
 
     def terminate(self):
-        self.stopped = True
         super(ImageStreamer, self).terminate()
 
     def run(self):
-        self._camera = cv2.VideoCapture(0)
-        if not self._camera.read()[0]:
-            self._camera = cv2.VideoCapture(1)
-            if not self._camera.read()[0]:
-                raise("Camera not conected")
+        for i in range(10):
+            self._camera = cv2.VideoCapture(i)
+            if self._camera.isOpened():
+                break
+        if not self._camera.isOpened():
+            raise("Camera not detected")
 
         self._camera.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
         self._camera.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
@@ -42,12 +43,14 @@ class ImageStreamer(Process):
         # Begin streaming
         # self._camera.start_recording(self, format='mjpeg')
 
-        while not self.stopped:
+        while not self.stop_event.is_set():
             receive_time = time.time()
+
             _, frame = self._camera.read()
             self.streaming_queue.put([frame, receive_time])
             cv2.waitKey(1)
 
+        self.terminate()
         self._camera.release()
 
         return self
@@ -66,8 +69,11 @@ class ImageStreamer(Process):
 
 
 if __name__ == "__main__":
+    manager = Manager()
+    stop_event = manager.Event()
+
     camera_queue = Queue(10)
-    image_streamer = ImageStreamer(camera_queue)
+    image_streamer = ImageStreamer(camera_queue, stop_event)
     image_streamer.start()
 
     i = 0

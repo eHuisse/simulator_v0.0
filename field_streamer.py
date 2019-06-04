@@ -1,12 +1,13 @@
 import pyaudio
-from multiprocessing import Process, Pipe, Queue
+from multiprocessing import Process, Queue
 import numpy as np
 import time
 import config
+from matplotlib import pyplot as plt
 
 
 class FieldStreamer(Process):
-    def __init__(self, streaming_queue, channels=2, rate=44100, frames_per_buffer=4096):
+    def __init__(self, streaming_queue, stop_event, channels=2, rate=44100, frames_per_buffer=2048):
         super(FieldStreamer, self).__init__()
         self.channels = channels
         self.rate = rate
@@ -18,18 +19,22 @@ class FieldStreamer(Process):
                                      rate=self.rate,
                                      input=True,
                                      frames_per_buffer=self.frames_per_buffer,
+                                     input_device_index=4,
                                      stream_callback=self.get_callback())
+        self.stop_event = stop_event
 
     def terminate(self):
         self._stream.close()
         self._pa.terminate()
+        self.stopped = True
         super(FieldStreamer, self).terminate()
 
     def run(self):
         # Use a stream with a callback in non-blocking mode
         self._stream.start_stream()
-        while self._stream.is_active():
+        while not self.stop_event.is_set():
             time.sleep(0.1)
+        self.terminate()
         return self
 
     def stop_recording(self):
@@ -37,8 +42,12 @@ class FieldStreamer(Process):
         return self
 
     def get_callback(self):
+
         def callback(in_data, frame_count, time_info, status):
-            self.streaming_queue.put_nowait(self.demux(in_data, self.channels))
+            try:
+                self.streaming_queue.put_nowait(self.demux(in_data, self.channels))
+            except:
+                pass
             return in_data, pyaudio.paContinue
         return callback
 
@@ -56,8 +65,8 @@ class FieldStreamer(Process):
 
         chunk_length = len(result) / channels
         assert chunk_length == int(chunk_length)
-
-        result = np.reshape(result, (chunk_length, channels))
+        #print("chunk length : " +str(chunk_length)+ " ; channels : " +str(channels))
+        result = np.reshape(result, (int(chunk_length), channels))
         return result
 
 
@@ -68,10 +77,16 @@ if __name__ == "__main__":
     field_streamer.start()
     i = 0
 
-    while i < 100:
-        if not field_queue.empty():
-            i = i + 1
-            print("Chanel 1 : " + str(max(field_queue.get(True)[:, 0])))
-            print("Chanel 2 : " + str(max(field_queue.get(True)[:, 1])))
+    while i < 1:
 
+        i = i + 1
+        field = field_queue.get(True)
+
+        #print("Chanel 1 : " + str(max(field_queue.get(True)[:, 0])))
+        #print("Chanel 2 : " + str(max(field_queue.get(True)[:, 1])))
+
+    time_range = np.linspace(0, 0.1, len(field))
+    plt.figure()
+    plt.plot(time_range, field)
+    plt.show()
     field_streamer.terminate()
