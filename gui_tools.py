@@ -1,13 +1,23 @@
 import pygame
+from pygame.locals import *
 import math
 import cv2
 import numpy as np
 from tkinter import *
+import os
+import threading
 
 
-class Vu_meter():
-    def __init__(self, displaysurf, position=[0, 0], size=[130, 500], BGCOLOR=(0, 0, 0)):
-        self.DISPLAYSURF = displaysurf
+class Monitoring(threading.Thread):
+    def __init__(self, position=[0, 0], size=[130, 500], BGCOLOR=(0, 0, 0)):
+        # setup code
+        pygame.init()
+        BGCOLOR = (0, 0, 0)
+        WINDOWWIDTH = 770
+        WINDOWHEIGHT = 480
+        pygame.mixer.quit()  # stops unwanted audio output on some computers
+        self.DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT), HWSURFACE)
+        pygame.display.set_caption('VU Meter')
         self.position = position
         self.size = size
         w, h = pygame.display.get_surface().get_size()
@@ -23,7 +33,8 @@ class Vu_meter():
         self.PeakL = 0
         self.PeakR = 0
 
-    def update(self, data):
+
+    def update_vumeter(self, field_left, field_right):
         """
 
         :param data:
@@ -35,10 +46,10 @@ class Vu_meter():
                                                           self.size[1]))
         fontSmall = pygame.font.Font('freesansbold.ttf', 12)
 
-        amplitudel = (abs(max(data[:, 0])) / 32767)
+        amplitudel = (abs(max(field_left)) / 32767)
         LevelL = (int(41 + (20 * (math.log10(amplitudel + (1e-40))))))
 
-        amplituder = (abs(max(data[:, 1])) / 32767)
+        amplituder = (abs(max(field_right)) / 32767)
         LevelR = (int(41 + (20 * (math.log10(amplituder + (1e-40))))))
 
         #print(amplitudel)
@@ -117,19 +128,21 @@ class Vu_meter():
 
         pygame.display.update()
 
-def frame_show(image, DISPLAYSURF, position=[0, 0], size=[640, 480]):
-    frame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    frame = np.rot90(frame)
-    frame = pygame.surfarray.make_surface(frame)
+    def update_frame(self, image, is_rec=True, position=[0, 0], size=[640, 480]):
+        frame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        frame = np.rot90(frame)
+        frame = pygame.surfarray.make_surface(frame)
 
-    DISPLAYSURF.blit(frame, (position[0], position[1]))
+        self.DISPLAYSURF.blit(frame, (position[0], position[1]))
+        pygame.draw.circle(self.DISPLAYSURF, (255, 0, 0), (size[0] - 50, size[1] - 50), 10)
 
-    pygame.display.update()
+        pygame.display.update()
 
 
 class MyWindow:
     def __init__(self, win):
         self.is_recording = False
+        self.is_stopped = True
 
         self.btn_text = StringVar()
         self.btn_text.set("Start Recording")
@@ -152,8 +165,11 @@ class MyWindow:
 
     def start_pause_recording(self):
         self.is_recording = not self.is_recording
-        if self.is_recording:
-            self.btn_text.set("Pause Recording")
+        print(self.t1.get())
+        print(self.t2.get())
+        if self.is_stopped:
+            if self.is_recording:
+                self.btn_text.set("Pause Recording")
         else:
             self.btn_text.set("Start Recording")
 

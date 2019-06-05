@@ -2,10 +2,13 @@ import io
 import time
 from multiprocessing import Process, Queue, Pipe, Manager
 import cv2
+import numpy as np
 
-#class Imageandstamp(object):
-#    def __init__(self.):
 
+class Stamped_image():
+    def __init__(self):
+        self.image = np.array([])
+        self.time_stamp = 0
 
 class ImageStreamer(Process):
     def __init__(self, streaming_queue, stop_event, resolution=(640, 480), frame_rate=30):
@@ -18,7 +21,7 @@ class ImageStreamer(Process):
         # initialize the frame and the variable used to indicate
         # if the thread should be stopped
 
-
+        self._image = Stamped_image()
         self.stop_event = stop_event
 
 
@@ -42,12 +45,21 @@ class ImageStreamer(Process):
         #self._camera.framerate = self.frame_rate
         # Begin streaming
         # self._camera.start_recording(self, format='mjpeg')
-
+        print("#######################################")
+        print("####  Image begins to be streamed  ####")
+        print("#######################################")
         while not self.stop_event.is_set():
             receive_time = time.time()
 
             _, frame = self._camera.read()
-            self.streaming_queue.put([frame, receive_time])
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            self._image.time_stamp = receive_time
+            self._image.image = gray
+            try:
+                self.streaming_queue.put_nowait(self._image)
+            except:
+                pass
             cv2.waitKey(1)
 
         self.terminate()

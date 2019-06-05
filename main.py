@@ -1,8 +1,3 @@
-#!/usr/bin/python
-# VU meter written in Python (www.python.org) by Tim Howlett 1st April 2013,
-# Does not work with Python 2.7.3 or 2.7.4 Does work with 3.2.3
-# Requires the Pygame module (www.pygame.org)and the Pyaudio module (http://people.csail.mit.edu/hubert/pyaudio/)
-
 import sys
 import pygame
 import time
@@ -10,9 +5,11 @@ from pygame.locals import *
 from multiprocessing import Process, Queue, Manager
 import field_streamer as fs
 import camera_streamer as cs
+import feature_streamer as feat
 import gui_tools as gt
 import tkinter as tk
-
+import recorder as rec
+import config
 
 # set up a bunch of constants
 BGCOLOR = (0, 0, 0)
@@ -27,33 +24,38 @@ vumeter_position = [640, 0]
 manager = Manager()
 stop_event = manager.Event()
 
-# setup code
-pygame.init()
-pygame.mixer.quit()  # stops unwanted audio output on some computers
-DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT), HWSURFACE)
-pygame.display.set_caption('VU Meter')
-
 window = tk.Tk()
 mywin = gt.MyWindow(window)
 window.title('Hello Python')
 window.geometry("400x200+10+10")
 
 #Creation of fieldstreamer
-field_queue = Queue(10)
-field_streamer = fs.FieldStreamer(field_queue, stop_event)
+field_queue = Queue(100)
+field_streamer = fs.FieldStreamer(field_queue, stop_event, channels=config.channels, rate=config.sample_frequency, frames_per_buffer=config.buffer_size)
 field_streamer.start()
+field_stamped = fs.Stamped_field()
 
 #Creation of camera streamer
-image_queue = Queue(10)
-image_streamer = cs.ImageStreamer(image_queue, stop_event)
+image_queue = Queue(100)
+image_streamer = cs.ImageStreamer(image_queue, stop_event, resolution=config.image_size, frame_rate=config.frame_rate)
 image_streamer.start()
+image_stamped = cs.Stamped_image()
 
-vumeter = gt.Vu_meter(DISPLAYSURF, position=vumeter_position, size=vumeter_size)
+#Creation of feature streamer
+speedQueue = Queue(1)
+feature_streamer = feat.Feature_streamer(speedQueue)
+feature_streamer.start()
+
+recorder = rec.Recorder(config.buffer_size, config.image_size)
+recorder.create_new_file('Test')
+
+monitor = gt.Monitoring(position=vumeter_position, size=vumeter_size)
 
 time_previous = time.time()
-while True:
+while not stop_event.is_set():
     for event in pygame.event.get():
         if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
+            print("We quit and stop the threads")
             stop_event.set()
             pygame.quit()
             sys.exit(0)
@@ -64,17 +66,25 @@ while True:
 
     # Read the data and calcualte the left and right levels
     try:
-        image = image_queue.get(False)
-        gt.frame_show(image[0], DISPLAYSURF)
+        image_stamped = image_queue.get(False)
+        recorder.record_image(image_stamped)
+        monitor.update_frame(image_stamped.image)
     except:
         pass
 
     try:
-        field = field_queue.get(False)
-        time_previous = time.time()
-        vumeter.update(field)
+        #print(field_queue.qsize())
+        field_stamped = field_queue.get(False)
+        recorder.record_field(field_stamped)
+        monitor.update_vumeter(field_stamped.field_left, field_stamped.field_right)
     except:
         pass
+    #print(time.time() - time_previous)
+    if time.time()-time_previous > 3:
+        recorder.close_current_file()
+        break
+    #print(time.time() - time_previous)
+    #time_previous = time.time()
 
 
 

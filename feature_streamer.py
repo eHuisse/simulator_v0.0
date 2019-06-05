@@ -40,6 +40,7 @@ class Feature_streamer(Process):
         pygame.init()
         self._display_surf = pygame.display.set_mode(self.size,
                                                      RESIZABLE)
+        pygame.display.set_caption('featureDisplay')
         self._running = True
 
     def on_event(self, event):
