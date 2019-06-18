@@ -32,7 +32,6 @@ class FieldStreamer(Process):
     def terminate(self):
         self._stream.close()
         self._pa.terminate()
-        self.stopped = True
         super(FieldStreamer, self).terminate()
 
     def run(self):
@@ -103,11 +102,11 @@ if __name__ == "__main__":
         i = i + 1
         field = field_queue.get(True)
 
-        #print("Chanel 1 : " + str(max(field_queue.get(True)[:, 0])))
-        #print("Chanel 2 : " + str(max(field_queue.get(True)[:, 1])))
+        #print("Chanel 1 : " + str(min(field_queue.get(True)[:, 0])))
+        #print("Chanel 2 : " + str(min(field_queue.get(True)[:, 1])))
 
-    time_range = np.linspace(0, 0.1, len(field.field))
+    time_range = np.linspace(0, 0.5, len(field.field_right))
     plt.figure()
-    plt.plot(time_range, field.field)
+    plt.plot(time_range, field.field_right, 'r-', time_range, field.field_left, 'b-')
     plt.show()
     field_streamer.terminate()

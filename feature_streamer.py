@@ -12,6 +12,11 @@ GREEN = (  0, 255,   0)
 RED =   (255,   0,   0)
 
 
+class Stamped_Feature():
+    def __init__(self):
+        self.stamp = 0
+        self.dir = ''
+
 
 class Feature_streamer(Process):
     def __init__(self, speedQueue, feature_width=50):
@@ -110,6 +115,9 @@ class Feature_streamer(Process):
     def run(self):
         if self.on_init() == False:
             self._running = False
+        print("#######################################")
+        print("### Features begins to be streamed  ###")
+        print("#######################################")
 
         while (self._running):
             for event in pygame.event.get():

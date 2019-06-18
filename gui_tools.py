@@ -6,6 +6,7 @@ import numpy as np
 from tkinter import *
 import os
 import threading
+import fysom as fy
 
 
 class Monitoring(threading.Thread):
@@ -13,10 +14,10 @@ class Monitoring(threading.Thread):
         # setup code
         pygame.init()
         BGCOLOR = (0, 0, 0)
-        WINDOWWIDTH = 770
-        WINDOWHEIGHT = 480
+        self.total_width = 770
+        self.total_height = 500
         pygame.mixer.quit()  # stops unwanted audio output on some computers
-        self.DISPLAYSURF = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT), HWSURFACE)
+        self.DISPLAYSURF = pygame.display.set_mode((self.total_width, self.total_height), HWSURFACE)
         pygame.display.set_caption('VU Meter')
         self.position = position
         self.size = size
@@ -32,6 +33,7 @@ class Monitoring(threading.Thread):
         self.BGCOLOR = BGCOLOR
         self.PeakL = 0
         self.PeakR = 0
+        self.is_recording = False
 
 
     def update_vumeter(self, field_left, field_right):
@@ -134,49 +136,107 @@ class Monitoring(threading.Thread):
         frame = pygame.surfarray.make_surface(frame)
 
         self.DISPLAYSURF.blit(frame, (position[0], position[1]))
-        pygame.draw.circle(self.DISPLAYSURF, (255, 0, 0), (size[0] - 50, size[1] - 50), 10)
+
+        if self.is_recording:
+            pygame.draw.circle(self.DISPLAYSURF, (255, 0, 0), (size[0] - 50, size[1] - 50), 10)
 
         pygame.display.update()
 
+    def update_direction(self, left=False, right=False):
+        pygame.draw.rect(self.DISPLAYSURF, (0, 0, 0), [0, 480, self.total_width, 20])
+        if bool(left):
+            pygame.draw.rect(self.DISPLAYSURF, (255, 0, 0), [0, 480, self.total_width/2, 20])
+        else:
+            pass
+
+        if bool(right):
+            pygame.draw.rect(self.DISPLAYSURF, (0, 255, 0), [self.total_width / 2, 480, self.total_width / 2, 20])
+        else:
+            pass
+
+        pygame.display.update()
 
 class MyWindow:
-    def __init__(self, win):
-        self.is_recording = False
-        self.is_stopped = True
+    def __init__(self, win, recorder):
+
+        self.recorder = recorder
 
         self.btn_text = StringVar()
         self.btn_text.set("Start Recording")
+        self.rec_text = StringVar()
+        self.rec_text.set(" ")
 
-        self.lbl1=Label(win, text='Title')
-        self.lbl2=Label(win, text='Comments')
+        self.lbl1 = Label(win, text='Title')
+        self.lbl2 = Label(win, text='Comments')
+        self.lbl_rec = Label(win, textvariable=self.rec_text)
 
-        self.t1=Entry()
-        self.t2=Entry()
+        self.t1 = Entry()
+        self.t2 = Entry()
 
         self.lbl1.place(x=100, y=50)
         self.t1.place(x=200, y=50)
         self.lbl2.place(x=100, y=100)
         self.t2.place(x=200, y=100)
 
+        self.lbl_rec.place(x=100, y=210)
+
         self.b1=Button(win, textvariable=self.btn_text, command=self.start_pause_recording)
         self.b2=Button(win, text='Stop Recording', command=self.stop_recording)
         self.b1.place(x=50, y=150)
         self.b2.place(x=250, y=150)
+        self.title = ""
+        self.comments = ""
+
+        #Initialisation of finite state machine
+        self.fsm = fy.Fysom({
+            'initial': 'wait',
+            'events': [
+                {'name': 'start_new_record', 'src': 'wait', 'dst': 'recording'},
+                {'name': 'stop_from_rec', 'src': 'recording', 'dst': 'wait'},
+                {'name': 'pause_recording', 'src': 'recording', 'dst': 'pause'},
+                {'name': 'resume_recording', 'src': 'pause', 'dst': 'recording'},
+                {'name': 'stop_from_pause', 'src': 'pause', 'dst': 'wait'}
+            ]})
+
 
     def start_pause_recording(self):
-        self.is_recording = not self.is_recording
-        print(self.t1.get())
-        print(self.t2.get())
-        if self.is_stopped:
-            if self.is_recording:
-                self.btn_text.set("Pause Recording")
-        else:
-            self.btn_text.set("Start Recording")
+        # print(self.t1.get())
+        # print(self.t2.get())
+        if self.fsm.isstate('wait'):
+            self.fsm.start_new_record()
+            self.btn_text.set("Pause Recording")
+            self.title = self.t1.get()
+            self.comments = self.t2.get()
+            self.rec_text.set('Recording : ' + self.title)
+            self.recorder.create_new_file(self.title)
 
-        print(self.is_recording)
+        elif self.fsm.isstate('recording'):
+            self.fsm.pause_recording()
+            self.btn_text.set("Resume Recording")
+
+        elif self.fsm.isstate('pause'):
+            self.fsm.resume_recording()
+            self.btn_text.set("Pause Recording")
+
+        print(self.fsm.current)
 
     def stop_recording(self):
-        print("is stopped")
+        if self.fsm.isstate('wait'):
+            pass
+
+        elif self.fsm.isstate('recording'):
+            self.fsm.stop_from_rec()
+            self.recorder.close_current_file()
+            self.btn_text.set("Start Recording")
+            self.rec_text.set('')
+
+        elif self.fsm.isstate('pause'):
+            self.fsm.stop_from_pause()
+            self.recorder.close_current_file()
+            self.btn_text.set("Start Recording")
+            self.rec_text.set('')
+
+        print(self.fsm.current)
 
     def is_recording(self):
         return self.is_recording

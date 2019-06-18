@@ -52,10 +52,9 @@ class ImageStreamer(Process):
             receive_time = time.time()
 
             _, frame = self._camera.read()
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
             self._image.time_stamp = receive_time
-            self._image.image = gray
+            self._image.image = frame
             try:
                 self.streaming_queue.put_nowait(self._image)
             except:
@@ -98,7 +97,7 @@ if __name__ == "__main__":
             image = camera_queue.get(True)
             print("FPS : " + str(1/(time.time() - before)))
             before = time.time()
-            cv2.imshow('frame', image[0])
+            cv2.imshow('frame', image.image)
             cv2.waitKey(1)
 
     image_streamer.terminate()
