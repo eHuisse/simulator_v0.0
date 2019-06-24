@@ -13,15 +13,18 @@ import recorder as rec
 import config
 import random as rand
 import traceback
+import oscilloscope as osc
 
 # set up a bunch of constants
 BGCOLOR = (0, 0, 0)
 WINDOWWIDTH = 770
-WINDOWHEIGHT = 480
+WINDOWHEIGHT = 800
 PeakL = 0
 PeakR = 0
 vumeter_size = [130, 480]
 vumeter_position = [640, 0]
+oscilloscope_size=(770, 300)
+oscilloscope_positiom=(0,500)
 
 #Manager for all the process
 manager = Manager()
@@ -65,6 +68,8 @@ window.geometry("400x250+10+10")
 
 #Initialisation of vu meter
 monitor = gt.Monitoring(position=vumeter_position, size=vumeter_size)
+
+oscillo = osc.PGOscilloscope(monitor.DISPLAYSURF, oscilloscope_size, oscilloscope_positiom, 32768)
 
 time_previous = time.time()
 time_previous_feature = time.time()
@@ -110,6 +115,7 @@ while not stop_event.is_set():
             else:
                 monitor.is_recording = False
             monitor.update_vumeter(field_stamped.field_left, field_stamped.field_right)
+            oscillo.update(field_stamped.field_left, field_stamped.field_right)
         except:
             pass
 
@@ -127,9 +133,11 @@ while not stop_event.is_set():
         try:
             if time.time() - time_previous_feature > config.features_toogle_period:
                 time_previous_feature = time.time()
-                right_or_left = rand.sample(["right", "left"], 1)[0]
+                right_or_left = rand.sample(["right", "left", "straight"], 1)[0]
                 if right_or_left == "right":
                     feature_queue.put(-config.feature_speed)
+                elif right_or_left == "straight":
+                    feature_queue.put(0)
                 else:
                     feature_queue.put(config.feature_speed)
 

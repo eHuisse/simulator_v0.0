@@ -15,7 +15,7 @@ class Monitoring(threading.Thread):
         pygame.init()
         BGCOLOR = (0, 0, 0)
         self.total_width = 770
-        self.total_height = 500
+        self.total_height = 800
         pygame.mixer.quit()  # stops unwanted audio output on some computers
         self.DISPLAYSURF = pygame.display.set_mode((self.total_width, self.total_height), HWSURFACE)
         pygame.display.set_caption('VU Meter')
