@@ -11,6 +11,11 @@ BLUE =  (  0,   0, 255)
 GREEN = (  0, 255,   0)
 RED =   (255,   0,   0)
 
+def flight_detector(signal, threshold):
+    if max(signal) >= threshold:
+        return True
+    else:
+        return False
 
 class Stamped_Feature():
     def __init__(self):
@@ -19,7 +24,7 @@ class Stamped_Feature():
 
 
 class Feature_streamer(Process):
-    def __init__(self, speedQueue, feature_width=50):
+    def __init__(self, speedQueue, feature_width=80):
         '''
         This class is multiprocessing. It is used to stream on screen some feature for the stimulation of bee.
         :param speedQueue (Real): This queue is used to stream the moving speed of the feature if - to the left if + to the right

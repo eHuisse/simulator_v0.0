@@ -50,10 +50,9 @@ class FieldStreamer(Process):
         return self
 
     def get_callback(self):
-
         def callback(in_data, frame_count, time_info, status):
             #print(time_info)
-            inputADCtime_CompBasis = time.time() - time_info['current_time'] + time_info['input_buffer_adc_time']
+            inputADCtime_CompBasis = time.time()    #- time_info['current_time'] + time_info['input_buffer_adc_time']
             field = self.demux(in_data, self.channels)
             field = np.transpose(field)
             self._field.field_right = field[0, :]

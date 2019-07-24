@@ -9,8 +9,9 @@ image_size = (640, 480)
 frame_rate = 30
 
 ## Definition of serial port for controler
-serial_port = '/dev/ttyUSB1'
+serial_port = '/dev/ttyUSB0'
 baudrate = 115200
 
 features_toogle_period = 1
-feature_speed = 10
+feature_speed = 20
+feature_width = 80

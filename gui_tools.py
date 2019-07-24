@@ -7,6 +7,7 @@ from tkinter import *
 import os
 import threading
 import fysom as fy
+import time
 
 
 class Monitoring(threading.Thread):
@@ -173,6 +174,12 @@ class MyWindow:
         self.t1 = Entry()
         self.t2 = Entry()
 
+        #Record the timestamp of pause
+        self.inital_recording_time = 0
+        self.pause_begins = []
+        self.pause_ends = []
+        self.delta_relative = 0
+
         self.lbl1.place(x=100, y=50)
         self.t1.place(x=200, y=50)
         self.lbl2.place(x=100, y=100)
@@ -198,23 +205,39 @@ class MyWindow:
                 {'name': 'stop_from_pause', 'src': 'pause', 'dst': 'wait'}
             ]})
 
+    def get_delta_relative_time(self):
+        '''
+        This funtction return the delta of relative time of recording (True_time - delta) = relative time of recording
+        :return:
+        '''
+        return self.inital_recording_time + sum([( self.pause_ends[i] - self.pause_begins[i] ) for i in range(len(self.pause_ends))])
+
+
 
     def start_pause_recording(self):
         # print(self.t1.get())
         # print(self.t2.get())
         if self.fsm.isstate('wait'):
+
+            self.inital_recording_time = time.time()
+            self.delta_relative = self.get_delta_relative_time()
             self.fsm.start_new_record()
             self.btn_text.set("Pause Recording")
+
             self.title = self.t1.get()
             self.comments = self.t2.get()
+
             self.rec_text.set('Recording : ' + self.title)
             self.recorder.create_new_file(self.title)
 
         elif self.fsm.isstate('recording'):
+            self.pause_begins.append(time.time())
             self.fsm.pause_recording()
             self.btn_text.set("Resume Recording")
 
         elif self.fsm.isstate('pause'):
+            self.pause_ends.append(time.time())
+            self.delta_relative = self.get_delta_relative_time()
             self.fsm.resume_recording()
             self.btn_text.set("Pause Recording")
 
