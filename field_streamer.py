@@ -25,7 +25,7 @@ class FieldStreamer(Process):
                                      rate=self.rate,
                                      input=True,
                                      frames_per_buffer=self.frames_per_buffer,
-                                     input_device_index=4,
+                                     input_device_index=config.device_index,
                                      stream_callback=self.get_callback())
         self.stop_event = stop_event
 

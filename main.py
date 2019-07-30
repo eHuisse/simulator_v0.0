@@ -26,7 +26,7 @@ vumeter_position = [640, 0]
 oscilloscope_size=(770, 300)
 oscilloscope_positiom=(0, 500)
 
-is_flying = False
+is_flying = True
 
 #Manager for all the process
 manager = Manager()
@@ -86,6 +86,12 @@ time_previous_feature = time.time()
 
 right_or_left = "straight"
 
+def is_it_flying(field_left, field_right):
+    if max(field_left) > config.field_threshold or max(field_right) > config.field_threshold:
+        return True
+    else:
+        return False
+
 while not stop_event.is_set():
     try:
         for event in pygame.event.get():
@@ -130,6 +136,9 @@ while not stop_event.is_set():
                 monitor.is_recording = False
             monitor.update_vumeter(field_stamped.field_left, field_stamped.field_right)
             oscillo.update(field_stamped.field_left, field_stamped.field_right)
+            
+            is_flying = is_it_flying(field_stamped.field_left, field_stamped.field_right)
+            
             if is_flying:
                 if right_or_left == "right":
                     feature_queue_left.put(2*config.feature_speed)
@@ -162,12 +171,12 @@ while not stop_event.is_set():
             if time.time() - time_previous_feature > config.features_toogle_period:
                 time_previous_feature = time.time()
                 right_or_left = rand.sample(["right", "left", "straight"], 1)[0]
-                if right_or_left == "right":
-                    feature_queue_left.put(-config.feature_speed)
-                elif right_or_left == "straight":
-                    feature_queue_left.put(0)
-                else:
-                    feature_queue_left.put(config.feature_speed)
+#                if right_or_left == "right":
+#                    feature_queue_left.put(-config.feature_speed)
+#                elif right_or_left == "straight":
+#                    feature_queue_left.put(0)
+#                else:
+#                    feature_queue_left.put(config.feature_speed)
 
                 feature_stamped_left.stamp = time.time() - record_manager.delta_relative
                 feature_stamped_left.dir = right_or_left
